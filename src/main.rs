@@ -3,8 +3,12 @@ use std::sync::Arc;
 
 use dashmap::DashMap;
 use dotenvy::dotenv;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Mutex;
+
+/// Type alias for the key-value store
+type KvStore = DashMap<String, Vec<u8>>;
 
 #[tokio::main]
 async fn main() {
@@ -19,7 +23,7 @@ async fn main() {
     let address = format!("{}:{}", host, port);
 
     // Initialize the in-memory key-value store
-    let store = Arc::new(DashMap::new());
+    let store: Arc<KvStore> = Arc::new(DashMap::new());
 
     // Bind the TCP listener
     let listener = TcpListener::bind(&address)
@@ -38,6 +42,8 @@ async fn main() {
             }
         };
 
+        println!("New connection from {}", addr);
+
         // Clone references for the handler
         let store = Arc::clone(&store);
         let secret_key = secret_key.clone();
@@ -47,6 +53,7 @@ async fn main() {
             if let Err(e) = handle_connection(socket, &secret_key, store).await {
                 eprintln!("Error handling connection from {}: {}", addr, e);
             }
+            println!("Connection from {} closed", addr);
         });
     }
 }
@@ -54,13 +61,16 @@ async fn main() {
 /// Handles an individual client connection.
 /// Reads commands line by line, processes them, and writes responses.
 async fn handle_connection(
-    socket: TcpStream,
+    mut socket: TcpStream,
     secret_key: &str,
-    store: Arc<DashMap<String, String>>,
+    store: Arc<KvStore>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let (reader, mut writer) = socket.into_split();
+    let (reader, writer) = socket.split();
     let mut buf_reader = BufReader::new(reader);
     let mut line = String::new();
+
+    // Use a mutex to synchronize writes to the socket
+    let writer = Arc::new(Mutex::new(writer));
 
     loop {
         line.clear();
@@ -83,85 +93,107 @@ async fn handle_connection(
         let parts: Vec<&str> = command_line.splitn(4, ' ').collect();
 
         if parts.len() < 3 {
-            writer
-                .write_all(b"ERROR InvalidCommand\n")
-                .await
-                .unwrap_or(());
+            write_response(&writer, b"ERROR InvalidCommand\n").await;
             continue;
         }
 
         let auth_key = parts[0];
         let command = parts[1];
         let key = parts[2];
-        let value = if parts.len() == 4 { parts[3] } else { "" };
 
         // Authenticate
         if auth_key != secret_key {
-            writer
-                .write_all(b"ERROR AuthenticationFailed\n")
-                .await
-                .unwrap_or(());
+            write_response(&writer, b"ERROR AuthenticationFailed\n").await;
             continue;
         }
 
         match command.to_uppercase().as_str() {
             "PUT" => {
                 if parts.len() != 4 {
-                    writer
-                        .write_all(b"ERROR InvalidCommand\n")
-                        .await
-                        .unwrap_or(());
+                    write_response(&writer, b"ERROR InvalidCommand\n").await;
                     continue;
                 }
-                store.insert(key.to_string(), value.to_string());
-                writer.write_all(b"OK\n").await.unwrap_or(());
+
+                // Parse the value length
+                let value_length: usize = match parts[3].parse() {
+                    Ok(len) => len,
+                    Err(_) => {
+                        write_response(&writer, b"ERROR InvalidCommand\n").await;
+                        continue;
+                    }
+                };
+
+                // Read the exact number of bytes for the value
+                let mut value = vec![0u8; value_length];
+                let mut total_read = 0;
+                while total_read < value_length {
+                    match buf_reader.read(&mut value[total_read..]).await? {
+                        0 => break, // Connection closed unexpectedly
+                        n => total_read += n,
+                    }
+                }
+
+                if total_read != value_length {
+                    write_response(&writer, b"ERROR IncompleteValue\n").await;
+                    continue;
+                }
+
+                // Store the key-value pair
+                store.insert(key.to_string(), value);
+                write_response(&writer, b"OK\n").await;
             }
             "GET" => {
                 if parts.len() != 3 {
-                    writer
-                        .write_all(b"ERROR InvalidCommand\n")
-                        .await
-                        .unwrap_or(());
+                    write_response(&writer, b"ERROR InvalidCommand\n").await;
                     continue;
                 }
+
                 match store.get(key) {
                     Some(v) => {
-                        let response = format!("OK {}\n", v.value());
-                        writer.write_all(response.as_bytes()).await.unwrap_or(());
+                        let value = v.value();
+                        let value_length = value.len();
+                        let header = format!("OK {}\n", value_length);
+                        let mut response = header.into_bytes();
+                        response.extend_from_slice(value);
+                        write_raw_response(&writer, &response).await;
                     }
                     None => {
-                        writer
-                            .write_all(b"ERROR KeyNotFound\n")
-                            .await
-                            .unwrap_or(());
+                        write_response(&writer, b"ERROR KeyNotFound\n").await;
                     }
                 }
             }
             "DELETE" => {
                 if parts.len() != 3 {
-                    writer
-                        .write_all(b"ERROR InvalidCommand\n")
-                        .await
-                        .unwrap_or(());
+                    write_response(&writer, b"ERROR InvalidCommand\n").await;
                     continue;
                 }
                 if store.remove(key).is_some() {
-                    writer.write_all(b"OK\n").await.unwrap_or(());
+                    write_response(&writer, b"OK\n").await;
                 } else {
-                    writer
-                        .write_all(b"ERROR KeyNotFound\n")
-                        .await
-                        .unwrap_or(());
+                    write_response(&writer, b"ERROR KeyNotFound\n").await;
                 }
             }
             _ => {
-                writer
-                    .write_all(b"ERROR InvalidCommand\n")
-                    .await
-                    .unwrap_or(());
+                write_response(&writer, b"ERROR InvalidCommand\n").await;
             }
         }
     }
 
     Ok(())
+}
+
+/// Writes a response line to the client.
+async fn write_response(writer: &Arc<Mutex<tokio::net::tcp::WriteHalf<'_>>>, response: &[u8]) {
+    let mut writer = writer.lock().await;
+    if let Err(e) = writer.write_all(response).await {
+        eprintln!("Failed to write response: {}", e);
+    }
+}
+
+/// Writes raw bytes to the client.
+async fn write_raw_response(writer: &Arc<Mutex<tokio::net::tcp::WriteHalf<'_>>>, response: &[u8]) {
+    let mut writer = writer.lock().await;
+    if let Err(e) = writer.write_all(response).await {
+        eprintln!("Failed to write raw response: {}", e);
+    }
 }
