@@ -3,7 +3,7 @@ name: Build and Release
 on:
   push:
     tags:
-      - '*'  # Triggers on any tag push. Modify the pattern if needed (e.g., 'v*' for version tags)
+      - '*'  # Triggers on any tag push.
 
 jobs:
   build-and-release:
@@ -14,17 +14,17 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      # 2. Set up Rust toolchain
+      # 2. Set up Rust toolchain using shivammathur/setup-rust
       - name: Set up Rust
-        uses: actions/setup-rust@v1
+        uses: shivammathur/setup-rust@v1
         with:
-          rust-version: stable  # You can specify a different version if needed
+          rust-version: stable
+          target: x86_64-unknown-linux-gnu
 
       # 3. Build the Rust application in release mode
       - name: Build Application
         run: |
           cargo build --release
-        # Assuming the binary is named 'doni' and located at 'target/release/doni'
 
       # 4. Create GitHub Release
       - name: Create GitHub Release
