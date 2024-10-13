@@ -1,53 +1,50 @@
-name: Release
+name: Build and Release
 
 on:
   push:
     tags:
-      - 'v*'  # This triggers the workflow only when a tag starting with "v" is pushed
+      - '*'  # Triggers on any tag push. Modify the pattern if needed (e.g., 'v*' for version tags)
 
 jobs:
-  build:
-    name: Build and Release
+  build-and-release:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      # 1. Check out the repository
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-    - name: Set up Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        target: x86_64-unknown-linux-gnu
+      # 2. Set up Rust toolchain
+      - name: Set up Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable  # You can specify a different version if needed
 
-    - name: Build project
-      run: cargo build --release --target=x86_64-unknown-linux-gnu
+      # 3. Build the Rust application in release mode
+      - name: Build Application
+        run: |
+          cargo build --release
+        # Assuming the binary is named 'doni' and located at 'target/release/doni'
 
-    - name: Create release directory
-      run: mkdir -p release
+      # 4. Create GitHub Release
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
 
-    - name: Copy binary to release directory
-      run: cp target/x86_64-unknown-linux-gnu/release/doni ./release/
-
-    - name: Upload release asset
-      uses: actions/upload-artifact@v3
-      with:
-        name: doni-x86_64-linux
-        path: ./release/doni
-
-  release:
-    name: Create GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: release/doni
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 5. Upload the compiled binary as a release asset
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./target/release/doni
+          asset_name: doni-linux
+          asset_content_type: application/octet-stream
