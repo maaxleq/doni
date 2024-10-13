@@ -23,6 +23,18 @@ jobs:
           profile: minimal
           override: true
 
+      - name: Install target for Linux
+        run: rustup target add x86_64-unknown-linux-gnu
+        if: matrix.platform == 'ubuntu-latest'
+
+      - name: Install target for macOS
+        run: rustup target add x86_64-apple-darwin
+        if: matrix.platform == 'macos-latest'
+
+      - name: Install target for Windows
+        run: rustup target add x86_64-pc-windows-msvc
+        if: matrix.platform == 'windows-latest'
+
       - name: Install dependencies
         run: cargo fetch
 
@@ -58,37 +70,3 @@ jobs:
         with:
           name: doni-windows
           path: target/x86_64-pc-windows-msvc/release/doni.exe
-
-  release:
-    name: Create GitHub Release
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Download Linux artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: doni-linux
-          path: ./releases
-
-      - name: Download macOS artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: doni-macos
-          path: ./releases
-
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: doni-windows
-          path: ./releases
-
-      - name: Create GitHub release
-        uses: ncipollo/release-action@v1
-        with:
-          body: "Release of Doni"
-          tag: ${{ github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          files: |
-            ./releases/doni-linux
-            ./releases/doni-macos
-            ./releases/doni-windows
