@@ -1,0 +1,62 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - '*'  # Triggers on any tag push.
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    permissions: write-all
+    
+    steps:
+      # Check out the repository
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Install musl-tools for static linking
+      - name: Install musl-tools
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      # Set up Rust toolchain and add musl target using actions-rs/toolchain
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-musl
+          override: true
+
+      # Build the Rust application in release mode targeting musl
+      - name: Build Application
+        run: |
+          cargo build --release --target x86_64-unknown-linux-musl
+
+      # Strip the binary to reduce size
+      - name: Strip Binary
+        run: |
+          strip ./target/x86_64-unknown-linux-musl/release/doni
+
+      # Create GitHub Release
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      # Upload the compiled binary as a release asset
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./target/x86_64-unknown-linux-musl/release/doni
+          asset_name: doni-linux
+          asset_content_type: application/octet-stream
