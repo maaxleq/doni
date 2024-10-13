@@ -2,7 +2,7 @@
 
 **Doni** is a simple, high-performance, TCP-based key-value (KV) store written in Rust. It supports storing and retrieving arbitrary byte sequences, making it versatile for various applications. The server employs a custom protocol over TCP, ensuring efficient communication and secure access through environment-based authentication.
 
----
+
 
 ## Table of Contents
 
@@ -42,7 +42,7 @@
   - [Acknowledgements](#acknowledgements)
   - [Contact](#contact)
 
----
+
 
 ## Features
 
@@ -54,7 +54,7 @@
 - **In-Memory Storage**: Fast access to key-value pairs stored in memory.
 - **Extensible**: Easily adaptable for additional features like data persistence or advanced authentication mechanisms.
 
----
+
 
 ## Requirements
 
@@ -62,7 +62,7 @@
 - **Cargo**: Rust’s package manager (comes bundled with Rust).
 - **Environment**: Ability to set environment variables or use a `.env` file.
 
----
+
 
 ## Installation
 
@@ -83,7 +83,7 @@
 
    The compiled binary will be located at `target/release/doni`.
 
----
+
 
 ## Configuration
 
@@ -92,7 +92,7 @@ Doni uses environment variables to configure its operation. These can be set dir
 ### Environment Variables
 
 | Variable          | Description                                        | Default Value   | Required |
-|-------------------|----------------------------------------------------|-----------------|----------|
+|-|-|--|-|
 | `DONI_SECRET_KEY` | The secret key for authenticating clients.         | *None*          | Yes      |
 | `DONI_HOST`       | The host address to bind the server.               | `127.0.0.1`     | No       |
 | `DONI_PORT`       | The port number on which the server listens.       | *None*          | Yes      |
@@ -109,7 +109,7 @@ DONI_PORT=8080
 
 **Note**: Replace `your_secret_key` with a strong, unpredictable string to ensure secure authentication.
 
----
+
 
 ## Usage
 
@@ -152,7 +152,7 @@ Clients communicate with Doni using a custom protocol over TCP. Each command is 
 - `<VALUE_LENGTH>`: (Required for `PUT`) The length of the value in bytes.
 - `<VALUE_BYTES>`: (Required for `PUT`) The raw byte sequence to store.
 
----
+
 
 #### PUT Command
 
@@ -186,7 +186,7 @@ OK
 
 When storing binary data, ensure that `<VALUE_LENGTH>` accurately reflects the number of bytes being sent.
 
----
+
 
 #### GET Command
 
@@ -228,7 +228,7 @@ my_secret_key GET username
   ERROR KeyNotFound
   ```
 
----
+
 
 #### DELETE Command
 
@@ -262,7 +262,7 @@ my_secret_key DELETE username
   ERROR KeyNotFound
   ```
 
----
+
 
 ## Protocol Specification
 
@@ -324,7 +324,7 @@ Responses from the server are structured as follows:
 - `<STATUS>`: `OK` for successful operations or `ERROR <message>` for failures.
 - `<DATA>`: Present only in `GET` responses, indicating the length and the raw bytes of the value.
 
----
+
 
 ## Testing
 
@@ -395,7 +395,7 @@ Responses from the server are structured as follows:
 - Handling binary data with `netcat` is cumbersome.
 - Newlines in `<VALUE_BYTES>` can disrupt the protocol.
 
----
+
 
 ### Using a Custom Python Client
 
@@ -503,7 +503,7 @@ DELETE Response: OK
 GET Response: ERROR KeyNotFound
 ```
 
----
+
 
 ## Error Handling
 
@@ -512,7 +512,7 @@ Doni provides meaningful error messages to help clients understand the nature of
 ### Common Errors
 
 | Error Message           | Description                                                   |
-|-------------------------|---------------------------------------------------------------|
+|-||
 | `ERROR AuthenticationFailed` | The provided authentication key does not match the server's key. |
 | `ERROR InvalidCommand`         | The command is malformed or missing required fields.            |
 | `ERROR KeyNotFound`            | The specified key does not exist in the store.                  |
@@ -577,7 +577,7 @@ Doni provides meaningful error messages to help clients understand the nature of
    ERROR IncompleteValue
    ```
 
----
+
 
 ## Concurrency and Performance
 
@@ -589,7 +589,7 @@ Doni leverages Rust's asynchronous capabilities through the Tokio runtime and us
 - **Thread-Safe Storage**: `DashMap` allows concurrent reads and writes without explicit locking.
 - **Scalability**: Capable of handling numerous simultaneous connections, limited primarily by system resources.
 
----
+
 
 ## Contributing
 
@@ -630,13 +630,13 @@ Contributions are welcome! Whether it's bug fixes, feature enhancements, or docu
 
    Navigate to the original repository and click on "Compare & pull request" to submit your changes for review.
 
----
+
 
 ## License
 
 This project is licensed under the [MIT License](LICENSE).
 
----
+
 
 ## Acknowledgements
 
@@ -645,12 +645,12 @@ This project is licensed under the [MIT License](LICENSE).
 - **DashMap**: [https://github.com/xacrimon/dashmap](https://github.com/xacrimon/dashmap)
 - **dotenvy**: [https://github.com/dotenvy-rs/dotenvy](https://github.com/dotenvy-rs/dotenvy)
 
----
+
 
 ## Contact
 
 For any questions, issues, or suggestions, please open an issue in the [GitHub repository](https://github.com/maaxleq/doni/issues) or contact the maintainer at [maxenceleq@gmail.com](mailto:maxenceleq@gmail.com).
 
----
+
 
 **Happy Key-Value Storing with Doni! 🚀**
