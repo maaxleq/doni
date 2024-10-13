@@ -13,7 +13,10 @@ type KvStore = DashMap<String, Vec<u8>>;
 #[tokio::main]
 async fn main() {
     // Load environment variables from .env file
-    dotenv().expect("Failed to load .env file");
+    match dotenv() {
+        Ok(_) => {}
+        Err(_) => eprintln!("Failed to load .env file, continuing"),
+    }
 
     // Retrieve environment variables
     let secret_key = env::var("DONI_SECRET_KEY").expect("DONI_SECRET_KEY not set");
