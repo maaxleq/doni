@@ -1,72 +1,51 @@
-name: Build and Release Doni
+name: Release
 
 on:
   push:
     tags:
-      - '*'
+      - 'v*'  # This triggers the workflow only when a tag starting with "v" is pushed
 
 jobs:
   build:
-    name: Build Doni for All Platforms
+    name: Build and Release
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        platform: [ubuntu-latest, macos-latest, windows-latest]
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          override: true
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        target: x86_64-unknown-linux-gnu
 
-      - name: Install target for Linux
-        run: rustup target add x86_64-unknown-linux-gnu
-        if: matrix.platform == 'ubuntu-latest'
+    - name: Build project
+      run: cargo build --release --target=x86_64-unknown-linux-gnu
 
-      - name: Install target for macOS
-        run: rustup target add x86_64-apple-darwin
-        if: matrix.platform == 'macos-latest'
+    - name: Create release directory
+      run: mkdir -p release
 
-      - name: Install target for Windows
-        run: rustup target add x86_64-pc-windows-msvc
-        if: matrix.platform == 'windows-latest'
+    - name: Copy binary to release directory
+      run: cp target/x86_64-unknown-linux-gnu/release/doni ./release/
 
-      - name: Install dependencies
-        run: cargo fetch
+    - name: Upload release asset
+      uses: actions/upload-artifact@v3
+      with:
+        name: doni-x86_64-linux
+        path: ./release/doni
 
-      - name: Build Doni (Linux)
-        run: cargo build --release --target x86_64-unknown-linux-gnu
-        if: matrix.platform == 'ubuntu-latest'
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Build Doni (macOS)
-        run: cargo build --release --target x86_64-apple-darwin
-        if: matrix.platform == 'macos-latest'
-
-      - name: Build Doni (Windows)
-        run: cargo build --release --target x86_64-pc-windows-msvc
-        if: matrix.platform == 'windows-latest'
-
-      - name: Upload release assets (Linux)
-        uses: actions/upload-artifact@v3
-        if: matrix.platform == 'ubuntu-latest'
-        with:
-          name: doni-linux
-          path: target/x86_64-unknown-linux-gnu/release/doni
-
-      - name: Upload release assets (macOS)
-        uses: actions/upload-artifact@v3
-        if: matrix.platform == 'macos-latest'
-        with:
-          name: doni-macos
-          path: target/x86_64-apple-darwin/release/doni
-
-      - name: Upload release assets (Windows)
-        uses: actions/upload-artifact@v3
-        if: matrix.platform == 'windows-latest'
-        with:
-          name: doni-windows
-          path: target/x86_64-pc-windows-msvc/release/doni.exe
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release/doni
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
