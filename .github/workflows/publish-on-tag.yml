@@ -14,12 +14,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      # 2. Set up Rust toolchain using shivammathur/setup-rust
+      # 2. Set up Rust toolchain using actions-rs/toolchain
       - name: Set up Rust
-        uses: shivammathur/setup-rust@v1
+        uses: actions-rs/toolchain@v1
         with:
-          rust-version: stable
-          target: x86_64-unknown-linux-gnu
+          toolchain: stable
+          override: true
 
       # 3. Build the Rust application in release mode
       - name: Build Application
