@@ -1,0 +1,94 @@
+name: Build and Release Doni
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build:
+    name: Build Doni for All Platforms
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Install dependencies
+        run: cargo fetch
+
+      - name: Build Doni (Linux)
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+        if: matrix.platform == 'ubuntu-latest'
+
+      - name: Build Doni (macOS)
+        run: cargo build --release --target x86_64-apple-darwin
+        if: matrix.platform == 'macos-latest'
+
+      - name: Build Doni (Windows)
+        run: cargo build --release --target x86_64-pc-windows-msvc
+        if: matrix.platform == 'windows-latest'
+
+      - name: Upload release assets (Linux)
+        uses: actions/upload-artifact@v3
+        if: matrix.platform == 'ubuntu-latest'
+        with:
+          name: doni-linux
+          path: target/x86_64-unknown-linux-gnu/release/doni
+
+      - name: Upload release assets (macOS)
+        uses: actions/upload-artifact@v3
+        if: matrix.platform == 'macos-latest'
+        with:
+          name: doni-macos
+          path: target/x86_64-apple-darwin/release/doni
+
+      - name: Upload release assets (Windows)
+        uses: actions/upload-artifact@v3
+        if: matrix.platform == 'windows-latest'
+        with:
+          name: doni-windows
+          path: target/x86_64-pc-windows-msvc/release/doni.exe
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: doni-linux
+          path: ./releases
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: doni-macos
+          path: ./releases
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: doni-windows
+          path: ./releases
+
+      - name: Create GitHub release
+        uses: ncipollo/release-action@v1
+        with:
+          body: "Release of Doni"
+          tag: ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            ./releases/doni-linux
+            ./releases/doni-macos
+            ./releases/doni-windows
